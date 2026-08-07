@@ -68,10 +68,10 @@ function hive.new<T>(): Hive<T>
     }
 
     local inner: HiveInner<T> = {
-        blocks = table.create(8),
+        blocks = table.create(128),
         block_count = 1,
 
-        slot_shift = math.log(2, props.slot_size),
+        slot_shift = math.log(props.slot_size, 2),
         slot_mask = props.slot_size - 1,
         slot_index = 0,
 
@@ -152,12 +152,6 @@ function hive.insert<T>(self: Hive<T>, value: T): number
     if slot_index == props.slot_size then
         inner.block_count = block_index + 1
         inner.blocks[block_index + 1] = table.create(props.slot_size)
-
-        if bit32.band(0b11, block_index + 1) then
-            props.slot_size  *= 2
-            inner.slot_shift = math.log(2, props.slot_size)
-            inner.slot_mask  = props.slot_size - 1
-        end
     end
 
     return (block_index - 1) * props.slot_size + slot_index
