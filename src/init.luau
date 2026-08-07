@@ -12,10 +12,6 @@ export type HiveProps<T> = {
     ---     [ slot, slot, slot, slot ]
     --- ]
     slot_size: number,
-
-    --- used to clac slot index
-    --- value is log2(slot_size)
-    slot_shift: number,
 }
 
 --- Hive element block
@@ -32,6 +28,14 @@ type HiveInner<T> = {
     --- blocks count
     --- indexing faster
     block_count: number,
+
+    --- used to clac slot index
+    --- value is log2(slot_size)
+    slot_shift: number,
+
+    --- used to clac slot index
+    --- value is slot_size - 1
+    slot_mask: number,
 
     --- slot index
     --- store next index
@@ -60,14 +64,15 @@ export type Hive<T> = typeof(setmetatable(
 
 function hive.new<T>(): Hive<T>
     local props: HiveProps<T> = {
-        slot_size = 4,     -- 2^k   slot size
-        slot_shift = 2,    -- k     (log2(slot_Size))
+        slot_size = 16,     -- 2^k   slot size
     }
 
     local inner: HiveInner<T> = {
         blocks = table.create(8),
         block_count = 1,
 
+        slot_shift = math.log(2, props.slot_size),
+        slot_mask = props.slot_size - 1,
         slot_index = 0,
 
         free_slots = {},
@@ -86,7 +91,6 @@ function hive.new<T>(): Hive<T>
 end
 
 function hive.index<T>(self: Hive<T>, idx: number): T?
-    local props = self.props
     local inner = self.inner
 
     if idx < 1 then
@@ -100,15 +104,11 @@ function hive.index<T>(self: Hive<T>, idx: number): T?
     -- shift right 2
     -- 0b0000
     -- degit to 0
-    local block_index = bit32.rshift(fit_idx, props.slot_shift) + 1
+    local block_index = bit32.rshift(fit_idx, inner.slot_shift) + 1
 
     if inner.blocks[block_index] == nil then
         return nil
     end
-
-    -- slot size - 1 to binary
-    -- 0b0011
-    local mask = props.slot_size - 1
 
     -- index for 8
     --   0b0111 | index - 1
@@ -116,7 +116,7 @@ function hive.index<T>(self: Hive<T>, idx: number): T?
     --   0b0011
     -- to digit 3
     -- final index is 4
-    local slot_index = bit32.band(fit_idx, mask) + 1
+    local slot_index = bit32.band(fit_idx, inner.slot_mask) + 1
 
     return inner.blocks[block_index][slot_index]
 end
@@ -128,15 +128,13 @@ function hive.insert<T>(self: Hive<T>, value: T): number
     local free_count = inner.free_count
     local free_slots = inner.free_slots
 
-    local mask = props.slot_size - 1
-
     if free_count > 0 then
         local free_index = free_slots[free_count]
         inner.free_count = free_count - 1
         free_slots[free_count] = nil
 
-        local block_index = bit32.rshift(free_index - 1, props.slot_shift) + 1
-        local slot_index  = bit32.band(free_index - 1, mask) + 1
+        local block_index = bit32.rshift(free_index - 1, inner.slot_shift) + 1
+        local slot_index  = bit32.band(free_index - 1, inner.slot_mask) + 1
 
         inner.blocks[block_index][slot_index] = value
         inner.live_count = inner.live_count + 1
@@ -145,7 +143,7 @@ function hive.insert<T>(self: Hive<T>, value: T): number
     end
 
     local block_index = inner.block_count
-    local slot_index = bit32.band(inner.slot_index, mask) + 1
+    local slot_index = bit32.band(inner.slot_index, inner.slot_mask) + 1
 
     inner.blocks[block_index][slot_index] = value
     inner.live_count = inner.live_count + 1
@@ -154,21 +152,26 @@ function hive.insert<T>(self: Hive<T>, value: T): number
     if slot_index == props.slot_size then
         inner.block_count = block_index + 1
         inner.blocks[block_index + 1] = table.create(props.slot_size)
+
+        if bit32.band(0b11, block_index + 1) then
+            props.slot_size  *= 2
+            inner.slot_shift = math.log(2, props.slot_size)
+            inner.slot_mask  = props.slot_size - 1
+        end
     end
 
     return (block_index - 1) * props.slot_size + slot_index
 end
 
 function hive.remove<T>(self: Hive<T>, idx: number)
-    local props = self.props
     local inner = self.inner
 
     if idx < 1 then
         return
     end
 
-    local shift = props.slot_shift
-    local mask  = props.slot_size - 1
+    local shift = inner.slot_shift
+    local mask  = inner.slot_mask
 
     local block_index = bit32.rshift(idx - 1, shift) + 1
     local slot_index  = bit32.band(idx - 1, mask) + 1
