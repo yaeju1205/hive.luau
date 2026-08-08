@@ -286,6 +286,7 @@ end
 --- hive::insert("apple")
 ---
 --- print(hive:size()) -- 1
+--- ```
 ---
 --- @return hive size
 function hive.size<T>(self: Hive<T>): number
