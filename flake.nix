@@ -1,5 +1,5 @@
 {
-  description = "implement C++ data structure std::hive on luau";
+  description = "Implement C++ data structure std::hive on luau";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

@@ -11,7 +11,6 @@ print(hive:index(a)) --> "alpha"
 hive:remove(b)
 
 print(hive:size()) --> 2
-print(hive:is_empty()) --> false
 
 for index, value in hive:iter() do
     print(index, value)

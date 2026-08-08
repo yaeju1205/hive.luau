@@ -31,7 +31,6 @@ hive:index(a) --> "alpha"
 hive:remove(b)
 
 hive:size() --> 2
-hive:is_empty() --> false
 
 for index, value in hive:iter() do
     print(index, value)
@@ -48,7 +47,6 @@ end
 | `hive:remove(idx: number)` | Removes the value at an index, freeing the slot for reuse. |
 | `hive:iter(): () -> (number, T)` | Returns a stateful iterator over `(index, value)` pairs. |
 | `hive:size(): number` | Returns the number of live elements. |
-| `hive:is_empty(): boolean` | Returns whether the hive has no live elements. |
 
 ## How it works
 

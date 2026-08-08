@@ -8,9 +8,12 @@ export type HiveProps<T> = {
     --- slot size in element block
     --- element blocks
     --- [
-    ---     [ slot, slot, slot, slot ]
-    ---     [ slot, slot, slot, slot ]
+    ---   [ slot, slot, slot, slot ]
+    ---   [ slot, slot, slot, slot ]
     --- ]
+    ---
+    --- slot size is power of two integer
+    --- default: 16
     slot_size: number,
 }
 
@@ -31,10 +34,37 @@ type HiveInner<T> = {
 
     --- used to clac slot index
     --- value is log2(slot_size)
+    ---
+    --- slot size is 2^k
+    --- slot shift is k
+    ---
+    --- slot size   (binary) | 1000
+    --- slot shift  (digit)  | 4
+    ---
+    --- if index is 12 and slot size is 4 then
+    --- index           | 1100  (12)
+    --- fit index       | 1011  (11) (sub : 1)
+    --- slot shift      | 2
+    --- shifted index   | 0010  (2)  (shift : 1)
+    --- block index     | 0011  (3)  (add : 1)
+    ---                              total cost : 3
+    --- get a block index
     slot_shift: number,
 
     --- used to clac slot index
     --- value is slot_size - 1
+    ---
+    --- slot size | 1000
+    --- slot mask | 0111
+    ---
+    --- if index is 12 and slot size is 4 then
+    --- index       | 1100 (12)
+    --- fit index   | 1011 (11) (sub : 1)
+    --- slot mask   | 0011 (3)
+    --- bit anded   | 0011 (3)  (and : 1)
+    --- slot index  | 0100 (4)  (add : 1)
+    ---                         total cost : 3
+    --- get a slot index
     slot_mask: number,
 
     --- slot index
@@ -59,12 +89,15 @@ export type Hive<T> = typeof(setmetatable(
         props: HiveProps<T>,
         inner: HiveInner<T>,
     },
-    { __index = hive }
+    {} :: {
+        __index: typeof(hive),
+    }
 ))
 
+--- Create new hive metatable
 function hive.new<T>(): Hive<T>
     local props: HiveProps<T> = {
-        slot_size = 16,     -- 2^k   slot size
+        slot_size = 16, -- 2^k   slot size
     }
 
     local inner: HiveInner<T> = {
@@ -86,41 +119,52 @@ function hive.new<T>(): Hive<T>
         props = props,
         inner = inner,
     }, {
-        __index = hive
+        __index = hive,
     })
 end
 
+--- Index a hive slot
+--- over range then, return nil
+---
+--- for example
+--- ```lua
+--- local a_index = hive::insert("apple")
+--- local a = hive::index(a_index)
+--- ```
+---
+--- @param idx slot index
+--- @return slot value
 function hive.index<T>(self: Hive<T>, idx: number): T?
     local inner = self.inner
 
+    -- over range
     if idx < 1 then
         return nil
     end
 
-    local fit_idx = idx - 1
+    local block_index = bit32.rshift(idx - 1, inner.slot_shift) + 1
 
-    -- index for 4 - 1
-    -- 0b0011
-    -- shift right 2
-    -- 0b0000
-    -- degit to 0
-    local block_index = bit32.rshift(fit_idx, inner.slot_shift) + 1
-
+    -- over range
     if inner.blocks[block_index] == nil then
         return nil
     end
 
-    -- index for 8
-    --   0b0111 | index - 1
-    -- & 0b0011 | mask
-    --   0b0011
-    -- to digit 3
-    -- final index is 4
-    local slot_index = bit32.band(fit_idx, inner.slot_mask) + 1
+    local slot_index = bit32.band(idx - 1, inner.slot_mask) + 1
 
     return inner.blocks[block_index][slot_index]
 end
 
+--- Remove a value
+--- return inserted value index
+---
+--- for example
+--- ```lua
+--- local a_index = hive::insert("apple")
+--- local a = hive::index(a_index)
+--- ```
+---
+--- @param value slot value
+--- @return slot index
 function hive.insert<T>(self: Hive<T>, value: T): number
     local props = self.props
     local inner = self.inner
@@ -157,6 +201,15 @@ function hive.insert<T>(self: Hive<T>, value: T): number
     return (block_index - 1) * props.slot_size + slot_index
 end
 
+--- Remove a value
+---
+--- for example
+--- ```lua
+--- local a_index = hive::insert("apple")
+--- local a = hive::remove(a_index)
+--- ```
+---
+--- @param idx slot index
 function hive.remove<T>(self: Hive<T>, idx: number)
     local inner = self.inner
 
@@ -184,6 +237,18 @@ function hive.remove<T>(self: Hive<T>, idx: number)
     inner.free_slots[free_count] = idx
 end
 
+--- Get a hive iterator
+---
+--- for example
+--- ```lua
+--- hive::insert("apple")
+---
+--- for index, fruit in hive:iter() do
+---   print(index, fruit)
+--- end
+--- ```
+---
+--- @return hive iterator
 function hive.iter<T>(self: Hive<T>): () -> (number, T)
     local props = self.props
     local inner = self.inner
@@ -214,12 +279,17 @@ function hive.iter<T>(self: Hive<T>): () -> (number, T)
     end
 end
 
+--- Get a hive size
+---
+--- for example
+--- ```lua
+--- hive::insert("apple")
+---
+--- print(hive:size()) -- 1
+---
+--- @return hive size
 function hive.size<T>(self: Hive<T>): number
     return self.inner.live_count
-end
-
-function hive.is_empty<T>(self: Hive<T>): boolean
-    return self.inner.live_count == 0
 end
 
 return hive
