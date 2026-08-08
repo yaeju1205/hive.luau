@@ -127,7 +127,7 @@ end
 --- over range then, return nil
 ---
 --- for example
---- ```lua
+--- ```luau
 --- local a_index = hive::insert("apple")
 --- local a = hive::index(a_index)
 --- ```
@@ -158,7 +158,7 @@ end
 --- return inserted value index
 ---
 --- for example
---- ```lua
+--- ```luau
 --- local a_index = hive::insert("apple")
 --- local a = hive::index(a_index)
 --- ```
@@ -204,7 +204,7 @@ end
 --- Remove a value
 ---
 --- for example
---- ```lua
+--- ```luau
 --- local a_index = hive::insert("apple")
 --- local a = hive::remove(a_index)
 --- ```
@@ -240,7 +240,7 @@ end
 --- Get a hive iterator
 ---
 --- for example
---- ```lua
+--- ```luau
 --- hive::insert("apple")
 ---
 --- for index, fruit in hive:iter() do
@@ -282,7 +282,7 @@ end
 --- Get a hive size
 ---
 --- for example
---- ```lua
+--- ```luau
 --- hive::insert("apple")
 ---
 --- print(hive:size()) -- 1
