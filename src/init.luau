@@ -224,7 +224,7 @@ function hive.remove<T>(self: Hive<T>, idx: number)
     local slot_index  = bit32.band(idx - 1, mask) + 1
 
     local block = inner.blocks[block_index]
-    if block == nil or block[slot_index] == nil then
+    if block_index > inner.block_count then
         return
     end
 
