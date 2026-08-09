@@ -11,6 +11,9 @@ A hive stores elements in fixed-size blocks ("slots") and reuses freed slots via
 - **Free-slot reuse** — removed slots are recycled by later inserts instead of leaving permanent gaps.
 - **Cheap iteration** — elements are walked block by block, skipping empty slots.
 
+> [!NOTE]
+> `hive` is not a general performance optimization over a plain Luau table. A plain table is a native VM structure, while `hive` is a Luau-level wrapper around one, so it loses on raw ops/s for plain insert, index, remove, and iterate — see [Benchmark](#benchmark). The one case it wins is free-slot reuse: a plain table has no free list, so code that keeps appending past removed keys pays repeated array-part reallocation, while `hive` just reuses the freed slot. Reach for `hive` when that reuse pattern matters, not for speed in general.
+
 ## Installation
 
 This project has no external dependencies. Copy `src/init.luau` into your project (e.g. as a `Hive` module), or add this repository as a submodule/package source.
@@ -47,6 +50,14 @@ end
 | `hive:remove(idx: number)` | Removes the value at an index, freeing the slot for reuse. |
 | `hive:iter(): () -> (number, T)` | Returns a stateful iterator over `(index, value)` pairs. |
 | `hive:size(): number` | Returns the number of live elements. |
+
+## Benchmark
+
+```sh
+luau bench/init.luau
+```
+
+Times `insert`, `index`, `iter`, and `remove` (including free-slot reuse) over a configurable number of elements, alongside the same operations on a plain table for comparison. On this machine (N = 10000000), plain tables outperform `hive` on plain insert/index/iter/remove, from ~6.5x (remove) to ~19x (iterate). The one exception is free-slot reuse: `hive` reusing a freed slot beats a plain table appending past a removed key by ~4.2x, since the table pays for array-part reallocation that `hive`'s free list avoids — see the note in [Why hive?](#why-hive).
 
 ## How it works
 
