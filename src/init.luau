@@ -145,7 +145,7 @@ function hive.index<T>(self: Hive<T>, idx: number): T?
     local block_index = bit32.rshift(idx - 1, inner.slot_shift) + 1
 
     -- over range
-    if inner.blocks[block_index] == nil then
+    if block_index > inner.block_count then
         return nil
     end
 
